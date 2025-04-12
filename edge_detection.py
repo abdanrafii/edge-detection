@@ -15,35 +15,35 @@ def to_grayscale(image):
 def apply_sobel(image):
     gray = to_grayscale(image)
     blur = cv2.GaussianBlur(gray, (3, 3), 0)
-    
+
     sobelx = cv2.Sobel(blur, cv2.CV_64F, 1, 0, ksize=3)
     sobely = cv2.Sobel(blur, cv2.CV_64F, 0, 1, ksize=3)
     magnitude = cv2.magnitude(sobelx, sobely)
-    
+
     return cv2.convertScaleAbs(magnitude)
 
 def apply_prewitt(image):
     gray = to_grayscale(image)
     blur = cv2.GaussianBlur(gray, (3, 3), 0)
-    
+
     kernel_x = np.array([[1, 1, 1], [0, 0, 0], [-1, -1, -1]])
     kernel_y = np.array([[-1, 0, 1], [-1, 0, 1], [-1, 0, 1]])
-    
+
     prewitt_x = cv2.filter2D(blur, cv2.CV_64F, kernel_x)
     prewitt_y = cv2.filter2D(blur, cv2.CV_64F, kernel_y)
-    
+
     magnitude = cv2.magnitude(prewitt_x, prewitt_y)
     return cv2.convertScaleAbs(magnitude)
 
 def apply_roberts(image):
     gray = to_grayscale(image)
-    
+
     gx = np.array([[1, 0], [0, -1]], dtype=np.float32)
     gy = np.array([[0, 1], [-1, 0]], dtype=np.float32)
-    
+
     grad_x = cv2.filter2D(gray, cv2.CV_64F, gx)
     grad_y = cv2.filter2D(gray, cv2.CV_64F, gy)
-    
+
     magnitude = cv2.magnitude(grad_x, grad_y)
     magnitude = cv2.normalize(magnitude, None, 0, 255, cv2.NORM_MINMAX)
     edges = (magnitude > 30).astype(np.uint8) * 255
@@ -52,7 +52,7 @@ def apply_roberts(image):
 def apply_compass(image, direction="All Directions"):
     gray = to_grayscale(image)
     blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-    
+
     compass_kernels = {
         "North": np.array([[1, 1, 1], [1, -2, 1], [-1, -1, -1]]),
         "Northeast": np.array([[1, 1, -1], [1, -2, 1], [-1, 1, 1]]),
@@ -63,7 +63,7 @@ def apply_compass(image, direction="All Directions"):
         "West": np.array([[1, 1, -1], [1, -2, -1], [1, 1, -1]]),
         "Northwest": np.array([[1, -1, -1], [1, -2, 1], [1, 1, 1]])
     }
-    
+
     if direction == "All Directions":
         responses = [cv2.filter2D(blurred, cv2.CV_64F, k) for k in compass_kernels.values()]
         edge_map = np.max(np.abs(responses), axis=0)
@@ -71,24 +71,24 @@ def apply_compass(image, direction="All Directions"):
         kernel = compass_kernels[direction]
         edge_map = cv2.filter2D(blurred, cv2.CV_64F, kernel)
         edge_map = np.abs(edge_map)
-    
+
     edges = cv2.convertScaleAbs(edge_map)
     return edges
 
-def apply_log(image):
-    gray = to_grayscale(image)
-    
-    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-    laplacian = cv2.Laplacian(blurred, cv2.CV_64F)
-    
-    edges = np.zeros_like(laplacian, dtype=np.uint8)
-    for i in range(1, laplacian.shape[0]-1):
-        for j in range(1, laplacian.shape[1]-1):
-            if laplacian[i,j] == 0:
-                continue
-            neighbors = laplacian[i-1:i+2, j-1:j+2]
-            pos = neighbors > 0
-            neg = neighbors < 0
-            if np.any(pos) and np.any(neg):
-                edges[i,j] = 255
-    return edges
+def apply_log(image, sigma=1.0, noise_intensity=0.0):
+    if noise_intensity > 0:
+        noise = np.random.normal(0, noise_intensity, image.shape)
+        image = image + noise
+        image = np.clip(image, 0, 255).astype(np.uint8)
+
+    if sigma > 0:
+        blurred = cv2.GaussianBlur(image, (0, 0), sigma)
+    else:
+        blurred = image
+
+    log = cv2.Laplacian(blurred, cv2.CV_64F)
+
+    log = np.abs(log)
+    log = (log / log.max() * 255).astype(np.uint8)
+
+    return log

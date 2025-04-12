@@ -12,15 +12,34 @@ uploaded_file = st.file_uploader("Upload an Image", type=['jpg', 'png', 'jpeg', 
 algorithms = st.multiselect(
     "Choose Edge Detection Algorithms",
     ["Sobel", "Prewitt", "Roberts", "Compass", "LoG (Marr-Hildreth)"],
-    default=["Sobel"]
+    default=[]
 )
 
-# Add direction selection for Compass
+# Direction selection for Compass
 compass_direction = None
 if "Compass" in algorithms:
     compass_direction = st.selectbox(
         "Select Compass Direction",
         ["All Directions", "North", "Northeast", "East", "Southeast", "South", "Southwest", "West", "Northwest"]
+    )
+
+# Sliders for LoG
+noise_intensity = 0.0
+sigma = 0.0
+if "LoG (Marr-Hildreth)" in algorithms:
+    noise_intensity = st.slider(
+        "Noise Intensity",
+        min_value=0.0,
+        max_value=10.0,
+        value=0.0,
+        step=0.1,
+    )
+    sigma = st.slider(
+        "Sigma",
+        min_value=0.1,
+        max_value=5.0,
+        value=1.0,
+        step=0.1,
     )
 
 if uploaded_file is not None:
@@ -36,7 +55,7 @@ if uploaded_file is not None:
                 "Prewitt": apply_prewitt,
                 "Roberts": apply_roberts,
                 "Compass": lambda img: apply_compass(img, direction=compass_direction),
-                "LoG (Marr-Hildreth)": apply_log
+                "LoG (Marr-Hildreth)": lambda img: apply_log(img, sigma=sigma, noise_intensity=noise_intensity),
             }
 
             num_cols = len(algorithms)
