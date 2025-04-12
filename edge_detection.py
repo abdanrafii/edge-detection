@@ -49,23 +49,29 @@ def apply_roberts(image):
     edges = (magnitude > 30).astype(np.uint8) * 255
     return edges
 
-def apply_compass(image):
+def apply_compass(image, direction="All Directions"):
     gray = to_grayscale(image)
     blurred = cv2.GaussianBlur(gray, (5, 5), 0)
     
-    compass_kernels = [
-        np.array([[0, -1, -1], [1, 0, -1], [1, 1, 0]]),
-        np.array([[-1, -1, 0], [-1, 0, 1], [0, 1, 1]]),
-        np.array([[-1, 0, 1], [-1, 0, 1], [-1, 0, 1]]),
-        np.array([[1, 0, -1], [1, 0, -1], [1, 0, -1]]),
-        np.array([[1, 1, 0], [0, 0, 0], [-1, -1, 0]]),
-        np.array([[0, -1, -1], [1, 0, -1], [1, 1, 0]]),
-        np.array([[-1, -1, 0], [0, 0, 0], [1, 1, 0]]),
-        np.array([[1, 0, -1], [1, 0, -1], [1, 0, -1]]),
-    ]
+    compass_kernels = {
+        "North": np.array([[1, 1, 1], [1, -2, 1], [-1, -1, -1]]),
+        "Northeast": np.array([[1, 1, -1], [1, -2, 1], [-1, 1, 1]]),
+        "East": np.array([[-1, 1, 1], [-1, -2, 1], [-1, 1, 1]]),
+        "Southeast": np.array([[-1, 1, 1], [-1, -2, 1], [1, 1, -1]]),
+        "South": np.array([[-1, -1, -1], [1, -2, 1], [1, 1, 1]]),
+        "Southwest": np.array([[1, 1, -1], [1, -2, 1], [1, -1, 1]]),
+        "West": np.array([[1, 1, -1], [1, -2, -1], [1, 1, -1]]),
+        "Northwest": np.array([[1, -1, -1], [1, -2, 1], [1, 1, 1]])
+    }
     
-    responses = [cv2.filter2D(blurred, cv2.CV_64F, k) for k in compass_kernels]
-    edge_map = np.max(np.abs(responses), axis=0)
+    if direction == "All Directions":
+        responses = [cv2.filter2D(blurred, cv2.CV_64F, k) for k in compass_kernels.values()]
+        edge_map = np.max(np.abs(responses), axis=0)
+    else:
+        kernel = compass_kernels[direction]
+        edge_map = cv2.filter2D(blurred, cv2.CV_64F, kernel)
+        edge_map = np.abs(edge_map)
+    
     edges = cv2.convertScaleAbs(edge_map)
     return edges
 
