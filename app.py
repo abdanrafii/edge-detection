@@ -12,9 +12,10 @@ st.title("Edge Detection")
 
 uploaded_file = st.file_uploader("Upload an Image", type=['jpg', 'png', 'jpeg', 'webp'])
 
-algorithm = st.selectbox(
-    "Choose Edge Detection Algorithm",
-    ["Sobel", "Prewitt", "Roberts", "Compass", "LoG (Marr-Hildreth)"]
+algorithms = st.multiselect(
+    "Choose Edge Detection Algorithms",
+    ["Sobel", "Prewitt", "Roberts", "Compass", "LoG (Marr-Hildreth)"],
+    default=["Sobel"]
 )
 
 if uploaded_file is not None:
@@ -22,18 +23,24 @@ if uploaded_file is not None:
     st.image(image, caption='Original Image')
 
     if st.button("Run Edge Detection"):
-        if algorithm == "Sobel":
-            result = apply_sobel(image)
-        elif algorithm == "Prewitt":
-            result = apply_prewitt(image)
-        elif algorithm == "Roberts":
-            result = apply_roberts(image)
-        elif algorithm == "Compass":
-            result = apply_compass(image)
-        elif algorithm == "LoG (Marr-Hildreth)":
-            result = apply_log(image)
+        if not algorithms:
+            st.warning("Please select at least one algorithm")
         else:
-            result = None
+            algorithm_map = {
+                "Sobel": apply_sobel,
+                "Prewitt": apply_prewitt,
+                "Roberts": apply_roberts,
+                "Compass": apply_compass,
+                "LoG (Marr-Hildreth)": apply_log
+            }
 
-        if result is not None:
-            st.image(result, caption=f"{algorithm} Result", channels="GRAY")
+            num_cols = len(algorithms)
+            cols = st.columns(num_cols)
+            
+            for i, algo_name in enumerate(algorithms):
+                result = algorithm_map[algo_name](image)
+                with cols[i]:
+                    st.image(result, 
+                            caption=f"{algo_name} Result", 
+                            channels="GRAY",
+                            use_container_width =True)

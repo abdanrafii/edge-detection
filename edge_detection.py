@@ -10,56 +10,79 @@ def read_image(file):
     return rgb_image
 
 def to_grayscale(image):
-    return cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    return cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
 
 def apply_sobel(image):
     gray = to_grayscale(image)
     blur = cv2.GaussianBlur(gray, (3, 3), 0)
-    sobelx = cv2.Sobel(blur, cv2.CV_64F, 1, 0, ksize=5)
-    sobely = cv2.Sobel(blur, cv2.CV_64F, 0, 1, ksize=5)
-    sobelxy = cv2.Sobel(blur, cv2.CV_64F, 1, 1, ksize=5)
-    return cv2.convertScaleAbs(sobelxy)
+    
+    sobelx = cv2.Sobel(blur, cv2.CV_64F, 1, 0, ksize=3)
+    sobely = cv2.Sobel(blur, cv2.CV_64F, 0, 1, ksize=3)
+    magnitude = cv2.magnitude(sobelx, sobely)
+    
+    return cv2.convertScaleAbs(magnitude)
 
 def apply_prewitt(image):
     gray = to_grayscale(image)
     blur = cv2.GaussianBlur(gray, (3, 3), 0)
+    
     kernel_x = np.array([[1, 1, 1], [0, 0, 0], [-1, -1, -1]])
     kernel_y = np.array([[-1, 0, 1], [-1, 0, 1], [-1, 0, 1]])
-    prewitt_x = cv2.filter2D(blur, -1, kernel_x)
-    prewitt_y = cv2.filter2D(blur, -1, kernel_y)
-    prewitt = prewitt_x + prewitt_y
-    return cv2.convertScaleAbs(prewitt)
+    
+    prewitt_x = cv2.filter2D(blur, cv2.CV_64F, kernel_x)
+    prewitt_y = cv2.filter2D(blur, cv2.CV_64F, kernel_y)
+    
+    magnitude = cv2.magnitude(prewitt_x, prewitt_y)
+    return cv2.convertScaleAbs(magnitude)
 
 def apply_roberts(image):
     gray = to_grayscale(image)
-    gx = np.array([[1, 0], [0, -1]])
-    gy = np.array([[0, 1], [-1, 0]])
-    grad_x = ndimage.convolve(gray, gx)
-    grad_y = ndimage.convolve(gray, gy)
-    magnitude = np.sqrt(grad_x**2 + grad_y**2)
-    edges = (magnitude > 10) * 255
-    return edges.astype(np.uint8)
+    
+    gx = np.array([[1, 0], [0, -1]], dtype=np.float32)
+    gy = np.array([[0, 1], [-1, 0]], dtype=np.float32)
+    
+    grad_x = cv2.filter2D(gray, cv2.CV_64F, gx)
+    grad_y = cv2.filter2D(gray, cv2.CV_64F, gy)
+    
+    magnitude = cv2.magnitude(grad_x, grad_y)
+    magnitude = cv2.normalize(magnitude, None, 0, 255, cv2.NORM_MINMAX)
+    edges = (magnitude > 30).astype(np.uint8) * 255
+    return edges
 
 def apply_compass(image):
     gray = to_grayscale(image)
     blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-    gradient_x = cv2.Sobel(blurred, cv2.CV_64F, 1, 0, ksize=3)
-    gradient_y = cv2.Sobel(blurred, cv2.CV_64F, 0, 1, ksize=3)
-
+    
     compass_kernels = [
-        np.array([[-1, -1, -1], [-1, 8, -1], [-1, -1, -1]]),
-        np.array([[-1, -1, 2], [-1, 2, -1], [2, -1, -1]]),
-        # Add more compass kernels if needed
+        np.array([[0, -1, -1], [1, 0, -1], [1, 1, 0]]),
+        np.array([[-1, -1, 0], [-1, 0, 1], [0, 1, 1]]),
+        np.array([[-1, 0, 1], [-1, 0, 1], [-1, 0, 1]]),
+        np.array([[1, 0, -1], [1, 0, -1], [1, 0, -1]]),
+        np.array([[1, 1, 0], [0, 0, 0], [-1, -1, 0]]),
+        np.array([[0, -1, -1], [1, 0, -1], [1, 1, 0]]),
+        np.array([[-1, -1, 0], [0, 0, 0], [1, 1, 0]]),
+        np.array([[1, 0, -1], [1, 0, -1], [1, 0, -1]]),
     ]
-
-    responses = [cv2.filter2D(gradient_x, -1, k) + cv2.filter2D(gradient_y, -1, k) for k in compass_kernels]
-    edge_map = np.max(responses, axis=0)
-    edges = (edge_map > 50) * 255
-    return edges.astype(np.uint8)
+    
+    responses = [cv2.filter2D(blurred, cv2.CV_64F, k) for k in compass_kernels]
+    edge_map = np.max(np.abs(responses), axis=0)
+    edges = cv2.convertScaleAbs(edge_map)
+    return edges
 
 def apply_log(image):
     gray = to_grayscale(image)
-    laplacian = cv2.Laplacian(gray, cv2.CV_64F)
-    abs_laplacian = np.absolute(laplacian)
-    marr_hildreth = cv2.convertScaleAbs(abs_laplacian)
-    return marr_hildreth
+    
+    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+    laplacian = cv2.Laplacian(blurred, cv2.CV_64F)
+    
+    edges = np.zeros_like(laplacian, dtype=np.uint8)
+    for i in range(1, laplacian.shape[0]-1):
+        for j in range(1, laplacian.shape[1]-1):
+            if laplacian[i,j] == 0:
+                continue
+            neighbors = laplacian[i-1:i+2, j-1:j+2]
+            pos = neighbors > 0
+            neg = neighbors < 0
+            if np.any(pos) and np.any(neg):
+                edges[i,j] = 255
+    return edges
